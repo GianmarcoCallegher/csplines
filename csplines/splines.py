@@ -187,3 +187,31 @@ def center_spline(X, K):
     K = Z.T @ K @ Z
 
     return X, K
+
+
+def build_b_spline_diagonal_penalty(x, order, n_params, r):
+    knots = create_equidistant_knots(x=x, order=order, n_params=n_params)
+    X = build_design_matrix_b_spline(x=x, knots=knots, order=order)
+    K = build_p_spline_matrix(d=X.shape[1], r=r)
+
+    Z = constraint_sumzero(X)
+
+    X = X @ Z
+    K = Z.T @ K @ Z
+
+    D, U = jnp.linalg.eigh(K)
+    
+    rank = jnp.linalg.matrix_rank(K)
+    null_rank = K.shape[1] - rank
+
+    D = jnp.concatenate([jnp.ones(null_rank), D[null_rank:]])
+
+    D = 1 / jnp.sqrt(D)
+    UD = U @ jnp.diag(D)
+
+    X = X @ UD
+
+    X_f = X[:, :null_rank]
+    X_r = X[:, null_rank:]
+
+    return X_f, X_r
